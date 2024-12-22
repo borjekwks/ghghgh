@@ -1,0 +1,145 @@
+#!/usr/bin/env bash
+
+# Цвета для вывода
+LIGHTGREEN="\033[1;32m"
+NOCOLOR="\033[0m"
+
+echo -e "executing: ${LIGHTGREEN}          BORIS TOOL ${NOCOLOR}"
+echo "----------------------------"
+
+# Настройка прав доступа для файлов (если это имеет смысл для остальных файлов)
+chmod +x etc/* # Убедитесь, что вам это нужно для всех файлов в etc
+
+# Проверка и создание директории BORIS_TOOL
+boris_tool_dir="/sdcard/Download/BORIS_TOOL"
+if [[ ! -d "$boris_tool_dir" ]]; then
+  mkdir -p "$boris_tool_dir" || { echo "Failed to create directory $boris_tool_dir"; exit 1; }
+fi
+
+pak_folder="/data/data/com.termux/files/home/PakTool/pak_folder"
+output_folder="/data/data/com.termux/files/home/OBB_UNPACK/output"
+bms_source_dir="/data/data/com.termux/files/home/boris_tool/bms/"
+bms_dest_dir="$PREFIX/share/quickbms/"
+
+# Проверка наличия необходимых программ
+for cmd in qemu-i386 quickbms; do
+  command -v "$cmd" >/dev/null 2>&1 || { 
+    echo >&2 "$cmd is required but it's not installed. Please install it before running the script. Aborting."; 
+    exit 1; 
+  }
+done
+
+# Создание директории quickbms, если она не существует
+if [[ ! -d "$bms_dest_dir" ]]; then
+  mkdir -p "$bms_dest_dir" || { echo "Failed to create directory $bms_dest_dir"; exit 1; }
+fi
+
+# Копирование файлов без расширения в директорию quickbms
+if [[ -d "$bms_source_dir" ]]; then
+  cp -u "$bms_source_dir"* "$bms_dest_dir" || { echo "Failed to copy bms files to $bms_dest_dir"; exit 1; }
+  
+  # Устанавливаем права на выполнение и выводим имена файлов
+  for file in "$bms_dest_dir"*; do
+    chmod +x "$file" || { echo "Failed to set execute permission for $file"; }
+    echo "Set execute permission for: $file"
+  done
+else
+  echo "Source directory for bms files does not exist: $bms_source_dir"
+  exit 1
+fi
+
+unpacking() {
+  qemu-i386 "$bms_dest_dir/quickbms" etc/* "$pak_folder/$(basename "$selected_file")" "$output_folder"
+}
+
+repacking() {
+  qemu-i386 "$bms_dest_dir/quickbms" -w -r etc/* "$selected_file" /sdcard/Download/file_for_repack
+}
+
+function unpack {
+  prompt="Please select a file to unpack:"
+  options=($(find "$boris_tool_dir" -name "*.pak" -o -name "*.obb" 2>/dev/null))
+
+  if [[ ${#options[@]} -eq 0 ]]; then
+    echo "No .pak or .obb files found in $boris_tool_dir."
+    return
+  fi
+
+  PS3="$prompt "
+  select opt in "${options[@]}" "Quit"; do 
+    if (( REPLY == 1 + ${#options[@]} )); then
+      echo "Operation canceled."
+      exit
+    elif (( REPLY > 0 && REPLY <= ${#options[@]} )); then
+      selected_file="${options[$REPLY-1]}"
+      echo "You picked $selected_file which is file $REPLY"
+
+      mkdir -p "$pak_folder" || { echo "Failed to create directory $pak_folder"; exit 1; }
+      cp "$selected_file" "$pak_folder/" || { echo "Failed to copy $selected_file to $pak_folder"; exit 1; }
+
+      unpacking
+
+      if [[ $? -eq 0 ]]; then
+        echo "Unpacking completed successfully."
+      else
+        echo "An error occurred during unpacking."
+      fi
+      
+      rm -rf "$pak_folder"
+      break
+    else
+      echo "Invalid option. Try another one."
+    fi
+  done
+}
+
+function repack {
+  prompt="Please select a file to repack:"
+  options=($(find "$boris_tool_dir" -name "*.pak" -o -name "*.obb" 2>/dev/null))
+
+  if [[ ${#options[@]} -eq 0 ]]; then
+    echo "No .pak or .obb files found in $boris_tool_dir."
+    return
+  fi
+
+  PS3="$prompt "
+  select opt in "${options[@]}" "Quit"; do 
+    if (( REPLY == 1 + ${#options[@]} )); then
+      echo "Operation canceled."
+      exit
+    elif (( REPLY > 0 && REPLY <= ${#options[@]} )); then
+      selected_file="${options[$REPLY-1]}"
+      echo "You picked $selected_file which is file $REPLY"
+
+      repacking
+
+      if [[ $? -eq 0 ]]; then
+        echo "Repacking completed successfully."
+      else
+        echo "An error occurred during repacking."
+      fi
+      
+      break
+    else
+      echo "Invalid option. Try another one."
+    fi
+  done
+}
+
+PS3='Please enter your choice: '
+options=("Unpack" "Repack" "Quit")
+select opt in "${options[@]}"; do
+  case $opt in
+    "Unpack")
+      unpack
+      break
+      ;;
+    "Repack")
+      repack
+      ;;
+    "Quit")
+      break
+      ;;
+    *) echo "Invalid option $REPLY";;
+  esac
+done
