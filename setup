@@ -10,6 +10,9 @@ echo "----------------------------"
 # Настройка прав доступа для файлов (если это имеет смысл для остальных файлов)
 chmod +x etc/* # Убедитесь, что вам это нужно для всех файлов в etc
 
+mkdir -p /data/data/com.termux/files/home/boris_tool/bms/
+
+
 # Проверка и создание директории BORIS_TOOL
 boris_tool_dir="/sdcard/Download/BORIS_TOOL"
 if [[ ! -d "$boris_tool_dir" ]]; then
@@ -18,7 +21,7 @@ fi
 
 pak_folder="/data/data/com.termux/files/home/PakTool/pak_folder"
 output_folder="/data/data/com.termux/files/home/OBB_UNPACK/output"
-bms_source_dir="/data/data/com.termux/files/home/boris_tool/bms/"
+bms_source_dir="/data/data/com.termux/files/home/ghghgh/bms/"
 bms_dest_dir="$PREFIX/share/quickbms/"
 
 # Проверка наличия необходимых программ
